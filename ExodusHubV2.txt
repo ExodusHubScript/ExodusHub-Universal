@@ -1,584 +1,594 @@
--- ============================================================
--- Eddie's Hub  |  Script Loader
--- ============================================================
+-- ════════════════════════════════════════════════════════════════
+--  Exodus Hub V2  |  Universal Aimbot + Triggerbot + Misc
+--  Build  : 2026.04.16.4
+--  Notes  : aimbot, triggerbot, ESP, settings, misc (inf jump,
+--           noclip, fly, auto respawn, touch kill, anti-afk,
+--           fps boost). red/black Kunani-style UI. keyless.
+-- ════════════════════════════════════════════════════════════════
 
--- Cleanup old instance
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService     = game:GetService("TweenService")
+local CoreGui          = game:GetService("CoreGui")
+local Teams            = game:GetService("Teams")
+local Lighting         = game:GetService("Lighting")
+local VirtualUser      = game:GetService("VirtualUser")
+local Camera           = workspace.CurrentCamera
+local LocalPlayer      = Players.LocalPlayer
+local Workspace        = workspace
+local mouse            = LocalPlayer:GetMouse()
+
+-- ════════════════════════════════════════════════════════════════
+--  STATE
+-- ════════════════════════════════════════════════════════════════
+local State = {
+    -- Aimbot
+    AimbotEnabled    = false,
+    AimbotKey        = nil,
+    AimbotSmooth     = 8,
+    AimbotFOV        = 90,
+    ShowFOV          = true,
+    AimbotTargetPart = "Head",
+    LockTeammates    = true,
+    WallCheck        = true,
+    -- Triggerbot
+    TriggerEnabled   = false,
+    TriggerKey       = nil,
+    TriggerAlwaysOn  = false,
+    TriggerDelay     = 0,
+    -- ESP
+    ESP = {
+        BoxESP       = false,
+        OutlineESP   = false,
+        NameESP      = false,
+        DistanceESP  = false,
+        ESPTeammates = false,
+    },
+    -- Settings
+    WalkSpeed        = 16,
+    JumpPower        = 50,
+    Fullbright       = false,
+    NoFog            = false,
+    UIKey            = Enum.KeyCode.Q,
+    -- Misc
+    InfJump          = false,
+    Noclip           = false,
+    Fly              = false,
+    FlySpeed         = 80,
+    AutoRespawn      = false,
+    TouchKill        = false,
+    AntiAFK          = false,
+    FPSBoost         = false,
+}
+
+local C = {
+    bg      = Color3.fromRGB(10, 8, 10),
+    panel   = Color3.fromRGB(18, 14, 16),
+    card    = Color3.fromRGB(28, 20, 24),
+    cardHov = Color3.fromRGB(38, 26, 30),
+    accent  = Color3.fromRGB(230, 30, 50),
+    accentB = Color3.fromRGB(140, 10, 25),
+    accentD = Color3.fromRGB(90, 5, 15),
+    border  = Color3.fromRGB(70, 22, 30),
+    text    = Color3.fromRGB(255, 230, 232),
+    dim     = Color3.fromRGB(170, 110, 120),
+    white   = Color3.fromRGB(255, 255, 255),
+    on      = Color3.fromRGB(220, 30, 50),
+    off     = Color3.fromRGB(32, 20, 24),
+    red     = Color3.fromRGB(255, 50, 60),
+    green   = Color3.fromRGB(80, 210, 130),
+    yellow  = Color3.fromRGB(255, 200, 60),
+}
+
+local BUILD_TAG = "v2.0.0"
+local OWNER_TAG = "exodus"
+
+-- ════════════════════════════════════════════════════════════════
+--  CLEANUP
+-- ════════════════════════════════════════════════════════════════
 pcall(function()
-    for _, g in ipairs(game:GetService("CoreGui"):GetChildren()) do
-        if g.Name == "EddiesHub_Loader" then g:Destroy() end
-    end
-    for _, g in ipairs(game:GetService("Players").LocalPlayer.PlayerGui:GetChildren()) do
-        if g.Name == "EddiesHub_Loader" then g:Destroy() end
+    for _, g in ipairs(CoreGui:GetChildren()) do
+        if g.Name == "ExodusLoader" or g.Name == "ExodusHub_GUI"
+        or g.Name == "ExodusFloat" then
+            g:Destroy()
+        end
     end
 end)
 
-local Players    = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local UIS        = game:GetService("UserInputService")
-local plr        = Players.LocalPlayer
+-- ════════════════════════════════════════════════════════════════
+--  LOADING SCREEN
+-- ════════════════════════════════════════════════════════════════
+local loaderGui = Instance.new("ScreenGui")
+loaderGui.Name = "ExodusLoader"
+loaderGui.ResetOnSpawn = false
+loaderGui.DisplayOrder = 1000
+loaderGui.IgnoreGuiInset = true
+pcall(function() loaderGui.Parent = CoreGui end)
+if not loaderGui.Parent then loaderGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
--- ── Find best GUI parent ──────────────────────────────────
-local uiParent
-if gethui then
-    uiParent = gethui()
-else
-    local ok = pcall(function()
-        local t = Instance.new("ScreenGui")
-        t.Parent = game:GetService("CoreGui")
-        t:Destroy()
-    end)
-    uiParent = ok and game:GetService("CoreGui") or plr:WaitForChild("PlayerGui")
+local overlay = Instance.new("Frame", loaderGui)
+overlay.Size = UDim2.new(1,0,1,0)
+overlay.BackgroundColor3 = Color3.fromRGB(0,0,0)
+overlay.BackgroundTransparency = 1
+overlay.BorderSizePixel = 0
+TweenService:Create(overlay, TweenInfo.new(0.4), {BackgroundTransparency = 0.5}):Play()
+
+local card = Instance.new("Frame", loaderGui)
+card.AnchorPoint = Vector2.new(0.5, 0.5)
+card.Position = UDim2.new(0.5, 0, 0.65, 0)
+card.Size = UDim2.new(0, 540, 0, 230)
+card.BackgroundColor3 = C.bg
+card.BorderSizePixel = 0
+card.ClipsDescendants = true
+Instance.new("UICorner", card).CornerRadius = UDim.new(0, 16)
+local cardStroke = Instance.new("UIStroke", card)
+cardStroke.Color = C.border
+cardStroke.Thickness = 1.5
+
+local leftBar = Instance.new("Frame", card)
+leftBar.Size = UDim2.new(0, 4, 1, 0)
+leftBar.BackgroundColor3 = C.accent
+leftBar.BorderSizePixel = 0
+local lbg = Instance.new("UIGradient", leftBar)
+lbg.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, C.accentD),
+    ColorSequenceKeypoint.new(0.5, C.accent),
+    ColorSequenceKeypoint.new(1, C.accentD),
+})
+lbg.Rotation = 90
+
+local leftPanel = Instance.new("Frame", card)
+leftPanel.Size = UDim2.new(0, 190, 1, 0)
+leftPanel.Position = UDim2.new(0, 4, 0, 0)
+leftPanel.BackgroundColor3 = C.panel
+leftPanel.BorderSizePixel = 0
+
+local rightPanel = Instance.new("Frame", card)
+rightPanel.Size = UDim2.new(1, -194, 1, 0)
+rightPanel.Position = UDim2.new(0, 194, 0, 0)
+rightPanel.BackgroundTransparency = 1
+
+local mono = Instance.new("TextLabel", rightPanel)
+mono.Size = UDim2.new(0, 60, 0, 60)
+mono.Position = UDim2.new(0, 20, 0, 20)
+mono.BackgroundColor3 = C.accentB
+mono.BorderSizePixel = 0
+mono.Text = "E"
+mono.TextColor3 = C.white
+mono.Font = Enum.Font.GothamBlack
+mono.TextSize = 34
+Instance.new("UICorner", mono).CornerRadius = UDim.new(0, 12)
+local monoG = Instance.new("UIGradient", mono)
+monoG.Color = ColorSequence.new(C.accent, C.accentB)
+monoG.Rotation = 45
+
+local rTitle = Instance.new("TextLabel", rightPanel)
+rTitle.Size = UDim2.new(1, -100, 0, 26)
+rTitle.Position = UDim2.new(0, 92, 0, 24)
+rTitle.BackgroundTransparency = 1
+rTitle.Text = "Exodus Hub"
+rTitle.TextColor3 = C.text
+rTitle.Font = Enum.Font.GothamBlack
+rTitle.TextSize = 20
+rTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local rTag = Instance.new("TextLabel", rightPanel)
+rTag.Size = UDim2.new(1, -100, 0, 16)
+rTag.Position = UDim2.new(0, 92, 0, 52)
+rTag.BackgroundTransparency = 1
+rTag.Text = "V2  ·  Keyless  ·  Universal"
+rTag.TextColor3 = C.accent
+rTag.Font = Enum.Font.GothamBold
+rTag.TextSize = 11
+rTag.TextXAlignment = Enum.TextXAlignment.Left
+
+local rBy = Instance.new("TextLabel", rightPanel)
+rBy.Size = UDim2.new(1, -100, 0, 14)
+rBy.Position = UDim2.new(0, 92, 0, 70)
+rBy.BackgroundTransparency = 1
+rBy.Text = "by " .. OWNER_TAG
+rBy.TextColor3 = C.dim
+rBy.Font = Enum.Font.Gotham
+rBy.TextSize = 10
+rBy.TextXAlignment = Enum.TextXAlignment.Left
+
+local rDiv = Instance.new("Frame", rightPanel)
+rDiv.Size = UDim2.new(1, -40, 0, 1)
+rDiv.Position = UDim2.new(0, 20, 0, 100)
+rDiv.BackgroundColor3 = C.border
+rDiv.BorderSizePixel = 0
+
+local rStatus = Instance.new("TextLabel", rightPanel)
+rStatus.Size = UDim2.new(1, -40, 0, 16)
+rStatus.Position = UDim2.new(0, 20, 0, 112)
+rStatus.BackgroundTransparency = 1
+rStatus.Text = "Initialising..."
+rStatus.TextColor3 = C.dim
+rStatus.Font = Enum.Font.Gotham
+rStatus.TextSize = 11
+rStatus.TextXAlignment = Enum.TextXAlignment.Left
+
+local rTrack = Instance.new("Frame", rightPanel)
+rTrack.Size = UDim2.new(1, -40, 0, 5)
+rTrack.Position = UDim2.new(0, 20, 0, 140)
+rTrack.BackgroundColor3 = C.card
+rTrack.BorderSizePixel = 0
+Instance.new("UICorner", rTrack).CornerRadius = UDim.new(1, 0)
+
+local rFill = Instance.new("Frame", rTrack)
+rFill.Size = UDim2.new(0, 0, 1, 0)
+rFill.BackgroundColor3 = C.accent
+rFill.BorderSizePixel = 0
+Instance.new("UICorner", rFill).CornerRadius = UDim.new(1, 0)
+local rfg = Instance.new("UIGradient", rFill)
+rfg.Color = ColorSequence.new(C.accentB, C.accent)
+
+local rPct = Instance.new("TextLabel", rightPanel)
+rPct.Size = UDim2.new(1, -40, 0, 16)
+rPct.Position = UDim2.new(0, 20, 0, 154)
+rPct.BackgroundTransparency = 1
+rPct.Text = "0%"
+rPct.TextColor3 = C.accent
+rPct.Font = Enum.Font.GothamBold
+rPct.TextSize = 10
+rPct.TextXAlignment = Enum.TextXAlignment.Right
+
+local rVer = Instance.new("TextLabel", rightPanel)
+rVer.Size = UDim2.new(1, -40, 0, 16)
+rVer.Position = UDim2.new(0, 20, 1, -26)
+rVer.BackgroundTransparency = 1
+rVer.Text = BUILD_TAG .. "  ·  " .. OWNER_TAG
+rVer.TextColor3 = C.border
+rVer.Font = Enum.Font.Gotham
+rVer.TextSize = 9
+rVer.TextXAlignment = Enum.TextXAlignment.Right
+
+local STEPS = {
+    {label="Services",  sub="Loading core modules"},
+    {label="Interface", sub="Building UI"},
+    {label="Aimbot",    sub="Configuring aim"},
+    {label="Trigger",   sub="Wiring trigger"},
+    {label="ESP",       sub="Setting visuals"},
+    {label="Misc",      sub="Loading misc"},
+    {label="Ready",     sub="Finishing up"},
+}
+
+local stepDots, stepLabels = {}, {}
+for i, step in ipairs(STEPS) do
+    local y = 14 + (i-1) * 30
+    if i < #STEPS then
+        local line = Instance.new("Frame", leftPanel)
+        line.Size = UDim2.new(0, 2, 0, 18)
+        line.Position = UDim2.new(0, 21, 0, y+14)
+        line.BackgroundColor3 = C.border
+        line.BorderSizePixel = 0
+    end
+    local dot = Instance.new("Frame", leftPanel)
+    dot.Size = UDim2.new(0, 12, 0, 12)
+    dot.Position = UDim2.new(0, 16, 0, y+1)
+    dot.BackgroundColor3 = C.border
+    dot.BorderSizePixel = 0
+    Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+    stepDots[i] = dot
+
+    local lbl = Instance.new("TextLabel", leftPanel)
+    lbl.Size = UDim2.new(1, -40, 0, 14)
+    lbl.Position = UDim2.new(0, 36, 0, y)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = step.label
+    lbl.TextColor3 = C.dim
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 11
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    stepLabels[i] = lbl
+
+    local sub = Instance.new("TextLabel", leftPanel)
+    sub.Size = UDim2.new(1, -40, 0, 10)
+    sub.Position = UDim2.new(0, 36, 0, y+14)
+    sub.BackgroundTransparency = 1
+    sub.Text = step.sub
+    sub.TextColor3 = C.border
+    sub.Font = Enum.Font.Gotham
+    sub.TextSize = 9
+    sub.TextXAlignment = Enum.TextXAlignment.Left
 end
 
--- ── Colors ────────────────────────────────────────────────
-local C = {
-    bg        = Color3.fromRGB(18, 18, 18),
-    sidebar   = Color3.fromRGB(24, 24, 24),
-    card      = Color3.fromRGB(38, 38, 38),
-    cardHov   = Color3.fromRGB(48, 48, 48),
-    accent    = Color3.fromRGB(235, 100, 60),   -- Eddie orange
-    accentDim = Color3.fromRGB(120, 50, 30),
-    text      = Color3.fromRGB(240, 240, 240),
-    textDim   = Color3.fromRGB(150, 150, 150),
-    white     = Color3.fromRGB(255, 255, 255),
-    border    = Color3.fromRGB(55, 55, 55),
-    green     = Color3.fromRGB(80, 205, 80),
-    red       = Color3.fromRGB(220, 60, 60),
-    yellow    = Color3.fromRGB(220, 180, 50),
-    tabSel    = Color3.fromRGB(38, 38, 38),
-}
+TweenService:Create(card, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+    Position = UDim2.new(0.5, 0, 0.5, 0)
+}):Play()
+task.wait(0.55)
 
--- ── Script data ───────────────────────────────────────────
-local CATEGORIES = {
-    {
-        name  = "Universal",
-        icon  = "🌐",
-        color = Color3.fromRGB(90, 140, 220),
-        scripts = {
-            {
-                name  = "Universal TriggerBot",
-                key   = "Keyless",
-                desc  = "Auto-trigger, customisable keybind, always-on mode & friend whitelist",
-                icon  = "⚡",
-                url   = "https://raw.githubusercontent.com/UncleEddie471/Eddies-Hub/refs/heads/main/TriggerBot",
-            },
-            {
-                name  = "Universal Aimbot",
-                key   = "Keyless",
-                desc  = "Silent aim, FOV circle, smooth aim, prediction & ESP — works on any game",
-                icon  = "🎯",
-                url   = "https://raw.githubusercontent.com/UncleEddie471/Universal-Aimbot/refs/heads/main/Eddies_aimbot.lua",
-            },
-            {
-                name  = "Eddie's Universal Hub",
-                key   = "Keyless",
-                desc  = "All-in-one universal hub — works on any game",
-                icon  = "🌐",
-                url   = "https://raw.githubusercontent.com/UncleEddie471/Universal-Hub/refs/heads/main/Eddies.lua",
-            },
-        },
-    },
-    {
-        name  = "Murder Mystery 2",
-        icon  = "🔪",
-        color = Color3.fromRGB(220, 80, 60),
-        scripts = {
-            {
-                name  = "Vertex Hub",
-                key   = "Keyless",
-                desc  = "Complete MM2 hub — Aimbot, ESP, Auto Farm, Teleport",
-                icon  = "🎯",
-                url   = "https://raw.githubusercontent.com/CratosHub-Dev/MurderMyster-2/refs/heads/main/VertexHub",
-            },
-            {
-                name  = "Premium Aimbot",
-                key   = "Keyless",
-                desc  = "High-precision MM2 aimbot with silent aim & advanced targeting",
-                icon  = "💎",
-                url   = "https://raw.githubusercontent.com/CratosHub-Dev/MurderMystery2-/refs/heads/main/PremiumAimbot",
-            },
-            {
-                name  = "Exodus Hub",
-                key   = "Keyless",
-                desc  = "Full MM2 utility hub — Aimbot, ESP, Auto Farm & more",
-                icon  = "⚔️",
-                url   = "https://raw.githubusercontent.com/CratosHub-Dev/ExodusHub/refs/heads/main/ExodusMM2",
-            },
-            {
-                name  = "MM2 Spawner",
-                key   = "Keyless",
-                desc  = "Spawn any item/weapon in MM2 instantly",
-                icon  = "📦",
-                url   = "https://raw.githubusercontent.com/newestscript/mm2sources/refs/heads/main/murder.mystery2",
-            },
-            {
-                name  = "Xena Hub - Freeze Trade",
-                key   = "Keyless",
-                desc  = "Freeze trades in MM2 to prevent scams",
-                icon  = "🔒",
-                url   = "https://raw.githubusercontent.com/CratosHub-Dev/XenaHub/refs/heads/main/MM2FreezeTrade",
-            },
+for i = 1, #STEPS do
+    stepDots[i].BackgroundColor3 = C.accent
+    stepLabels[i].TextColor3 = C.text
+    local pct = i / #STEPS
+    TweenService:Create(rFill, TweenInfo.new(0.28, Enum.EasingStyle.Quad), {
+        Size = UDim2.new(pct, 0, 1, 0)
+    }):Play()
+    rPct.Text = math.floor(pct * 100) .. "%"
+    rStatus.Text = STEPS[i].sub .. "..."
+    task.wait(0.28)
+    stepDots[i].BackgroundColor3 = C.green
+    local chk = Instance.new("TextLabel", stepDots[i])
+    chk.Size = UDim2.new(1,0,1,0)
+    chk.BackgroundTransparency = 1
+    chk.Text = "✓"
+    chk.TextColor3 = C.white
+    chk.Font = Enum.Font.GothamBlack
+    chk.TextSize = 8
+end
 
-        },
-    },
-}
+rFill.Size = UDim2.new(1,0,1,0)
+rPct.Text = "100%"
+rStatus.Text = "Ready!"
+rStatus.TextColor3 = C.green
+task.wait(0.35)
 
--- ── ScreenGui ─────────────────────────────────────────────
-local gui = Instance.new("ScreenGui")
-gui.Name            = "EddiesHub_Loader"
-gui.ResetOnSpawn    = false
-gui.DisplayOrder    = 999
-gui.IgnoreGuiInset  = true
-gui.Enabled         = true
-gui.Parent          = uiParent
+TweenService:Create(card, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
+    Position = UDim2.new(0.5, 0, -0.3, 0)
+}):Play()
+TweenService:Create(overlay, TweenInfo.new(0.4), {BackgroundTransparency = 1}):Play()
+task.wait(0.42)
+loaderGui:Destroy()
 
--- ── Main window ───────────────────────────────────────────
-local win = Instance.new("Frame", gui)
-win.Name                = "Window"
-win.Size                = UDim2.new(0, 540, 0, 380)
-win.Position            = UDim2.new(0.5, -270, 0.5, -190)
-win.BackgroundColor3    = C.bg
-win.BorderSizePixel     = 0
-win.Active              = true
-win.ClipsDescendants    = true
-Instance.new("UICorner", win).CornerRadius = UDim.new(0, 12)
-local winStroke = Instance.new("UIStroke", win)
-winStroke.Color     = C.border
-winStroke.Thickness = 1
+-- ════════════════════════════════════════════════════════════════
+--  FOV CIRCLE
+-- ════════════════════════════════════════════════════════════════
+local FOVCircle
+pcall(function()
+    FOVCircle = Drawing.new("Circle")
+    FOVCircle.Color = C.accent
+    FOVCircle.Thickness = 1.5
+    FOVCircle.NumSides = 64
+    FOVCircle.Filled = false
+    FOVCircle.Visible = true
+end)
 
--- ── Title bar ─────────────────────────────────────────────
-local bar = Instance.new("Frame", win)
-bar.Size             = UDim2.new(1, 0, 0, 38)
-bar.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
-bar.BorderSizePixel  = 0
+local function isTeammate(p)
+    return LocalPlayer.Team and p.Team == LocalPlayer.Team
+end
+local function getESPColor(p)
+    if #Teams:GetChildren() > 0 and p.TeamColor then return p.TeamColor.Color end
+    return C.accent
+end
 
-local barDiv = Instance.new("Frame", bar)
-barDiv.Size             = UDim2.new(1, 0, 0, 1)
-barDiv.Position         = UDim2.new(0, 0, 1, -1)
-barDiv.BackgroundColor3 = C.border
-barDiv.BorderSizePixel  = 0
+-- ════════════════════════════════════════════════════════════════
+--  MAIN GUI
+-- ════════════════════════════════════════════════════════════════
+local Gui = Instance.new("ScreenGui")
+pcall(function() Gui.Parent = CoreGui end)
+if not Gui.Parent then Gui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+Gui.Name = "ExodusHub_GUI"
+Gui.ResetOnSpawn = false
+Gui.DisplayOrder = 999
+Gui.IgnoreGuiInset = true
 
--- Traffic light buttons (clickable)
-local function trafficBtn(parent, x, col, symbol)
-    local btn = Instance.new("TextButton", parent)
-    btn.Size             = UDim2.new(0, 14, 0, 14)
-    btn.Position         = UDim2.new(0, x, 0.5, -7)
-    btn.BackgroundColor3 = col
-    btn.BorderSizePixel  = 0
-    btn.Text             = ""
-    btn.AutoButtonColor  = false
-    btn.ZIndex           = 10
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
-    local sym = Instance.new("TextLabel", btn)
-    sym.Size                = UDim2.new(1, 0, 1, 0)
-    sym.BackgroundTransparency = 1
-    sym.Text                = symbol
-    sym.TextColor3          = Color3.fromRGB(0, 0, 0)
-    sym.Font                = Enum.Font.GothamBlack
-    sym.TextSize            = 9
-    sym.TextTransparency    = 1
-    sym.ZIndex              = 11
+local Win = Instance.new("Frame", Gui)
+Win.Size = UDim2.new(0, 460, 0, 360)
+Win.Position = UDim2.new(0.5, -230, 0.5, -180)
+Win.BackgroundColor3 = C.bg
+Win.BorderSizePixel = 0
+Win.ClipsDescendants = true
+Instance.new("UICorner", Win).CornerRadius = UDim.new(0, 14)
+local winStroke = Instance.new("UIStroke", Win)
+winStroke.Color = C.border
+winStroke.Thickness = 1.2
+
+local TBar = Instance.new("Frame", Win)
+TBar.Size = UDim2.new(1,0,0,36)
+TBar.BackgroundColor3 = C.panel
+TBar.BorderSizePixel = 0
+
+local TBarDiv = Instance.new("Frame", TBar)
+TBarDiv.Size = UDim2.new(1,0,0,1)
+TBarDiv.Position = UDim2.new(0,0,1,-1)
+TBarDiv.BackgroundColor3 = C.border
+TBarDiv.BorderSizePixel = 0
+
+local accentTag = Instance.new("Frame", TBar)
+accentTag.Size = UDim2.new(0,3,0,20)
+accentTag.Position = UDim2.new(0,12,0.5,-10)
+accentTag.BackgroundColor3 = C.accent
+accentTag.BorderSizePixel = 0
+Instance.new("UICorner", accentTag).CornerRadius = UDim.new(1,0)
+
+local mark2 = Instance.new("Frame", TBar)
+mark2.Size = UDim2.new(0, 20, 0, 20)
+mark2.Position = UDim2.new(0, 20, 0.5, -10)
+mark2.BackgroundColor3 = C.accentB
+mark2.BorderSizePixel = 0
+Instance.new("UICorner", mark2).CornerRadius = UDim.new(0, 5)
+local mark2Txt = Instance.new("TextLabel", mark2)
+mark2Txt.Size = UDim2.new(1,0,1,0)
+mark2Txt.BackgroundTransparency = 1
+mark2Txt.Text = "E"
+mark2Txt.TextColor3 = C.white
+mark2Txt.Font = Enum.Font.GothamBlack
+mark2Txt.TextSize = 12
+
+local TTitle = Instance.new("TextLabel", TBar)
+TTitle.Size = UDim2.new(1,-150,1,0)
+TTitle.Position = UDim2.new(0,46,0,0)
+TTitle.BackgroundTransparency = 1
+TTitle.Text = "Exodus Hub V2  |  Keyless"
+TTitle.TextColor3 = C.text
+TTitle.Font = Enum.Font.GothamBlack
+TTitle.TextSize = 13
+TTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local TVer = Instance.new("TextLabel", TBar)
+TVer.Size = UDim2.new(0,70,1,0)
+TVer.Position = UDim2.new(1,-94,0,0)
+TVer.BackgroundTransparency = 1
+TVer.Text = "by " .. OWNER_TAG
+TVer.TextColor3 = C.dim
+TVer.Font = Enum.Font.Gotham
+TVer.TextSize = 10
+TVer.TextXAlignment = Enum.TextXAlignment.Right
+
+local function headerBtn(xOff, lbl, col)
+    local b = Instance.new("TextButton", TBar)
+    b.Size = UDim2.new(0,22,0,22)
+    b.Position = UDim2.new(1,xOff,0.5,-11)
+    b.BackgroundColor3 = col
+    b.BorderSizePixel = 0
+    b.Text = lbl
+    b.TextColor3 = C.white
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 11
+    b.AutoButtonColor = false
+    Instance.new("UICorner", b).CornerRadius = UDim.new(1,0)
+    b.MouseEnter:Connect(function()
+        TweenService:Create(b,TweenInfo.new(0.1),{BackgroundColor3=col:Lerp(C.white,0.3)}):Play()
+    end)
+    b.MouseLeave:Connect(function()
+        TweenService:Create(b,TweenInfo.new(0.1),{BackgroundColor3=col}):Play()
+    end)
+    return b
+end
+
+local HideBtn  = headerBtn(-28, "−", Color3.fromRGB(70,30,36))
+local CloseBtn = headerBtn(-54, "×", Color3.fromRGB(200,40,50))
+
+local Sidebar = Instance.new("Frame", Win)
+Sidebar.Size = UDim2.new(0,100,1,-36)
+Sidebar.Position = UDim2.new(0,0,0,36)
+Sidebar.BackgroundColor3 = C.panel
+Sidebar.BorderSizePixel = 0
+
+local SideDiv = Instance.new("Frame", Win)
+SideDiv.Size = UDim2.new(0,1,1,-36)
+SideDiv.Position = UDim2.new(0,100,0,36)
+SideDiv.BackgroundColor3 = C.border
+SideDiv.BorderSizePixel = 0
+
+local ContentArea = Instance.new("Frame", Win)
+ContentArea.Size = UDim2.new(1,-101,1,-36)
+ContentArea.Position = UDim2.new(0,101,0,36)
+ContentArea.BackgroundTransparency = 1
+ContentArea.ClipsDescendants = true
+
+local FloatGui = Instance.new("ScreenGui")
+pcall(function() FloatGui.Parent = CoreGui end)
+if not FloatGui.Parent then FloatGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+FloatGui.Name = "ExodusFloat"
+FloatGui.ResetOnSpawn = false
+FloatGui.Enabled = false
+
+local FloatBtn = Instance.new("TextButton", FloatGui)
+FloatBtn.Size = UDim2.new(0,130,0,30)
+FloatBtn.Position = UDim2.new(1,-140,0,10)
+FloatBtn.BackgroundColor3 = C.accentB
+FloatBtn.BorderSizePixel = 0
+FloatBtn.Text = "Exodus Hub V2"
+FloatBtn.TextColor3 = C.white
+FloatBtn.Font = Enum.Font.GothamBold
+FloatBtn.TextSize = 12
+FloatBtn.AutoButtonColor = false
+Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(0,8)
+Instance.new("UIStroke", FloatBtn).Color = C.accent
+
+HideBtn.MouseButton1Click:Connect(function() Gui.Enabled = false; FloatGui.Enabled = true end)
+CloseBtn.MouseButton1Click:Connect(function()
+    Gui:Destroy()
+    FloatGui:Destroy()
+    if FOVCircle then FOVCircle.Visible = false end
+end)
+FloatBtn.MouseButton1Click:Connect(function() Gui.Enabled = true; FloatGui.Enabled = false end)
+
+local dragOn, dragStart, winStart = false, nil, nil
+TBar.InputBegan:Connect(function(inp)
+    if inp.UserInputType == Enum.UserInputType.MouseButton1
+    or inp.UserInputType == Enum.UserInputType.Touch then
+        dragOn = true
+        dragStart = inp.Position
+        winStart = Win.Position
+    end
+end)
+TBar.InputEnded:Connect(function(inp)
+    if inp.UserInputType == Enum.UserInputType.MouseButton1
+    or inp.UserInputType == Enum.UserInputType.Touch then
+        dragOn = false
+    end
+end)
+UserInputService.InputChanged:Connect(function(inp)
+    if not dragOn then return end
+    if inp.UserInputType == Enum.UserInputType.MouseMovement
+    or inp.UserInputType == Enum.UserInputType.Touch then
+        Win.Position = UDim2.new(
+            winStart.X.Scale, winStart.X.Offset + (inp.Position.X - dragStart.X),
+            winStart.Y.Scale, winStart.Y.Offset + (inp.Position.Y - dragStart.Y)
+        )
+    end
+end)
+
+-- ── tab system ──────────────────────────────────────────────────
+local tabs, tabBtns = {}, {}
+local activePage = nil
+
+local sidePad = Instance.new("UIPadding", Sidebar)
+sidePad.PaddingTop = UDim.new(0,6)
+sidePad.PaddingLeft = UDim.new(0,6)
+sidePad.PaddingRight = UDim.new(0,6)
+local sideList = Instance.new("UIListLayout", Sidebar)
+sideList.SortOrder = Enum.SortOrder.LayoutOrder
+sideList.Padding = UDim.new(0,3)
+
+local function setPage(name)
+    if activePage == name then return end
+    activePage = name
+    for n, pg in pairs(tabs) do pg.Visible = (n == name) end
+    for n, btn in pairs(tabBtns) do
+        local on = (n == name)
+        TweenService:Create(btn, TweenInfo.new(0.15), {
+            BackgroundColor3 = on and C.card or Color3.fromRGB(0,0,0),
+            BackgroundTransparency = on and 0 or 1,
+        }):Play()
+        local lb = btn:FindFirstChildOfClass("TextLabel")
+        if lb then lb.TextColor3 = on and C.text or C.dim end
+    end
+end
+
+local function addTab(name, icon, order)
+    local btn = Instance.new("TextButton", Sidebar)
+    btn.Size = UDim2.new(1,0,0,48)
+    btn.BackgroundColor3 = Color3.fromRGB(0,0,0)
+    btn.BackgroundTransparency = 1
+    btn.BorderSizePixel = 0
+    btn.Text = ""
+    btn.AutoButtonColor = false
+    btn.LayoutOrder = order
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
+
+    local ico = Instance.new("TextLabel", btn)
+    ico.Size = UDim2.new(1,0,0,20)
+    ico.Position = UDim2.new(0,0,0,6)
+    ico.BackgroundTransparency = 1
+    ico.Text = icon
+    ico.TextSize = 16
+    ico.Font = Enum.Font.GothamBold
+    ico.TextColor3 = C.dim
+
+    local lb = Instance.new("TextLabel", btn)
+    lb.Size = UDim2.new(1,0,0,14)
+    lb.Position = UDim2.new(0,0,0,28)
+    lb.BackgroundTransparency = 1
+    lb.Text = name
+    lb.TextSize = 10
+    lb.Font = Enum.Font.GothamBold
+    lb.TextColor3 = C.dim
+
+    btn.MouseButton1Click:Connect(function() setPage(name) end)
     btn.MouseEnter:Connect(function()
-        TweenService:Create(sym, TweenInfo.new(0.1), {TextTransparency = 0}):Play()
-        TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = col:Lerp(Color3.fromRGB(255,255,255), 0.25)}):Play()
+        if activePage ~= name then
+            TweenService:Create(btn,TweenInfo.new(0.1),{BackgroundTransparency=0.7}):Play()
+        end
     end)
     btn.MouseLeave:Connect(function()
-        TweenService:Create(sym, TweenInfo.new(0.1), {TextTransparency = 1}):Play()
-        TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = col}):Play()
-    end)
-    return btn
-end
-
-local normalSize = UDim2.new(0, 540, 0, 380)
-local normalPos  = UDim2.new(0.5, -270, 0.5, -190)
-local isFullscreen = false
-local isHidden = false
-
--- Mini restore button (shown when hidden)
-local miniBtn = Instance.new("TextButton", gui)
-miniBtn.Size             = UDim2.new(0, 120, 0, 28)
-miniBtn.Position         = UDim2.new(0, 10, 0, 10)
-miniBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
-miniBtn.BorderSizePixel  = 0
-miniBtn.Text             = "Eddie's Hub"
-miniBtn.TextColor3       = C.text
-miniBtn.Font             = Enum.Font.GothamBlack
-miniBtn.TextSize         = 12
-miniBtn.AutoButtonColor  = false
-miniBtn.Visible          = false
-miniBtn.ZIndex           = 200
-Instance.new("UICorner", miniBtn).CornerRadius = UDim.new(0, 6)
-local miniStroke = Instance.new("UIStroke", miniBtn)
-miniStroke.Color = C.accent
-miniStroke.Thickness = 1
-miniBtn.MouseButton1Click:Connect(function()
-    isHidden = false
-    win.Visible = true
-    miniBtn.Visible = false
-end)
-miniBtn.MouseEnter:Connect(function()
-    TweenService:Create(miniBtn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(40,40,40)}):Play()
-end)
-miniBtn.MouseLeave:Connect(function()
-    TweenService:Create(miniBtn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(28,28,28)}):Play()
-end)
-
--- RED: Destroy UI
-local redBtn = trafficBtn(bar, 14, C.red, "x")
-redBtn.MouseButton1Click:Connect(function()
-    TweenService:Create(win, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
-        Size = UDim2.new(0, 0, 0, 0),
-        BackgroundTransparency = 1
-    }):Play()
-    task.delay(0.22, function() gui:Destroy() end)
-end)
-
--- YELLOW: Hide to mini button
-local yellowBtn = trafficBtn(bar, 34, C.yellow, "-")
-yellowBtn.MouseButton1Click:Connect(function()
-    isHidden = true
-    win.Visible = false
-    miniBtn.Visible = true
-end)
-
--- GREEN: Toggle fullscreen
-local greenBtn = trafficBtn(bar, 54, C.green, "+")
-greenBtn.MouseButton1Click:Connect(function()
-    isFullscreen = not isFullscreen
-    if isFullscreen then
-        TweenService:Create(win, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
-            Size     = UDim2.new(1, 0, 1, 0),
-            Position = UDim2.new(0, 0, 0, 0)
-        }):Play()
-    else
-        TweenService:Create(win, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
-            Size     = normalSize,
-            Position = normalPos
-        }):Play()
-    end
-end)
-
--- Folder icon + title
-local titleLbl = Instance.new("TextLabel", bar)
-titleLbl.Size                = UDim2.new(1, -120, 1, 0)
-titleLbl.Position            = UDim2.new(0, 74, 0, 0)
-titleLbl.BackgroundTransparency = 1
-titleLbl.Text                = "Eddie's Hub"
-titleLbl.TextColor3          = C.text
-titleLbl.Font                = Enum.Font.GothamBlack
-titleLbl.TextSize            = 14
-titleLbl.TextXAlignment      = Enum.TextXAlignment.Left
-
--- ── Sidebar ───────────────────────────────────────────────
-local sidebar = Instance.new("Frame", win)
-sidebar.Name             = "Sidebar"
-sidebar.Size             = UDim2.new(0, 160, 1, -38)
-sidebar.Position         = UDim2.new(0, 0, 0, 38)
-sidebar.BackgroundColor3 = C.sidebar
-sidebar.BorderSizePixel  = 0
-
-local sideList = Instance.new("UIListLayout", sidebar)
-sideList.SortOrder  = Enum.SortOrder.LayoutOrder
-sideList.Padding    = UDim.new(0, 2)
-local sidePad = Instance.new("UIPadding", sidebar)
-sidePad.PaddingTop    = UDim.new(0, 8)
-sidePad.PaddingLeft   = UDim.new(0, 6)
-sidePad.PaddingRight  = UDim.new(0, 6)
-sidePad.PaddingBottom = UDim.new(0, 8)
-
--- Sidebar divider
-local sideDiv = Instance.new("Frame", win)
-sideDiv.Size             = UDim2.new(0, 1, 1, -38)
-sideDiv.Position         = UDim2.new(0, 160, 0, 38)
-sideDiv.BackgroundColor3 = C.border
-sideDiv.BorderSizePixel  = 0
-
--- ── Content area ──────────────────────────────────────────
-local content = Instance.new("Frame", win)
-content.Name             = "Content"
-content.Size             = UDim2.new(1, -161, 1, -38)
-content.Position         = UDim2.new(0, 161, 0, 38)
-content.BackgroundTransparency = 1
-content.ClipsDescendants = true
-
--- ── Dragging ──────────────────────────────────────────────
-local dragging, dragStart, winStart = false, nil, nil
-bar.InputBegan:Connect(function(inp)
-    if inp.UserInputType == Enum.UserInputType.MouseButton1
-    or inp.UserInputType == Enum.UserInputType.Touch then
-        dragging = true; dragStart = inp.Position; winStart = win.Position
-    end
-end)
-bar.InputEnded:Connect(function(inp)
-    if inp.UserInputType == Enum.UserInputType.MouseButton1
-    or inp.UserInputType == Enum.UserInputType.Touch then
-        dragging = false
-    end
-end)
-UIS.InputChanged:Connect(function(inp)
-    if dragging and (inp.UserInputType == Enum.UserInputType.MouseMovement
-    or inp.UserInputType == Enum.UserInputType.Touch) then
-        local dx = inp.Position.X - dragStart.X
-        local dy = inp.Position.Y - dragStart.Y
-        win.Position = UDim2.new(winStart.X.Scale, winStart.X.Offset+dx,
-                                  winStart.Y.Scale, winStart.Y.Offset+dy)
-    end
-end)
-
--- ── Toast notification ────────────────────────────────────
-local toastFrame = Instance.new("Frame", gui)
-toastFrame.Size             = UDim2.new(0, 260, 0, 40)
-toastFrame.Position         = UDim2.new(0.5, -130, 0, -50)
-toastFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-toastFrame.BorderSizePixel  = 0
-toastFrame.ZIndex           = 200
-Instance.new("UICorner", toastFrame).CornerRadius = UDim.new(0, 8)
-local toastStroke = Instance.new("UIStroke", toastFrame)
-toastStroke.Color = C.border
-
-local toastLbl = Instance.new("TextLabel", toastFrame)
-toastLbl.Size                = UDim2.new(1, -16, 1, 0)
-toastLbl.Position            = UDim2.new(0, 8, 0, 0)
-toastLbl.BackgroundTransparency = 1
-toastLbl.TextColor3          = C.text
-toastLbl.Font                = Enum.Font.GothamBold
-toastLbl.TextSize            = 13
-toastLbl.ZIndex              = 201
-
-local function toast(msg, col)
-    toastLbl.Text       = msg
-    toastStroke.Color   = col or C.accent
-    TweenService:Create(toastFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad),
-        {Position = UDim2.new(0.5, -130, 0, 12)}):Play()
-    task.delay(2.5, function()
-        TweenService:Create(toastFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad),
-            {Position = UDim2.new(0.5, -130, 0, -50)}):Play()
-    end)
-end
-
--- ── Build category pages & sidebar tabs ───────────────────
-local pages   = {}
-local tabBtns = {}
-local activeCat = nil
-
-local function setCategory(name)
-    if activeCat == name then return end
-    activeCat = name
-    for n, page in pairs(pages) do
-        page.Visible = (n == name)
-    end
-    for n, btn in pairs(tabBtns) do
-        local isOn = (n == name)
-        btn.BackgroundColor3 = isOn and C.tabSel or Color3.fromRGB(0,0,0)
-        btn.BackgroundTransparency = isOn and 0 or 1
-        local lbl = btn:FindFirstChildOfClass("TextLabel")
-        if lbl then lbl.TextColor3 = isOn and C.white or C.textDim end
-        local corner = btn:FindFirstChildOfClass("UICorner")
-        if corner then end
-    end
-end
-
-for ci, cat in ipairs(CATEGORIES) do
-    -- ── Sidebar tab button ──────────────────────────────
-    local tab = Instance.new("TextButton", sidebar)
-    tab.Size                = UDim2.new(1, 0, 0, 36)
-    tab.BackgroundColor3    = Color3.fromRGB(0,0,0)
-    tab.BackgroundTransparency = 1
-    tab.BorderSizePixel     = 0
-    tab.Text                = ""
-    tab.AutoButtonColor     = false
-    tab.LayoutOrder         = ci
-    Instance.new("UICorner", tab).CornerRadius = UDim.new(0, 8)
-
-    -- Colored icon pill
-    local iconPill = Instance.new("Frame", tab)
-    iconPill.Size             = UDim2.new(0, 28, 0, 28)
-    iconPill.Position         = UDim2.new(0, 6, 0.5, -14)
-    iconPill.BackgroundColor3 = cat.color
-    iconPill.BorderSizePixel  = 0
-    Instance.new("UICorner", iconPill).CornerRadius = UDim.new(0, 7)
-    local iconLbl = Instance.new("TextLabel", iconPill)
-    iconLbl.Size                = UDim2.new(1, 0, 1, 0)
-    iconLbl.BackgroundTransparency = 1
-    iconLbl.Text                = cat.icon
-    iconLbl.TextSize            = 14
-    iconLbl.Font                = Enum.Font.GothamBold
-    iconLbl.TextColor3          = C.white
-
-    -- Category name
-    local nameLbl = Instance.new("TextLabel", tab)
-    nameLbl.Size                = UDim2.new(1, -46, 1, 0)
-    nameLbl.Position            = UDim2.new(0, 42, 0, 0)
-    nameLbl.BackgroundTransparency = 1
-    nameLbl.Text                = cat.name
-    nameLbl.TextColor3          = C.textDim
-    nameLbl.Font                = Enum.Font.GothamBold
-    nameLbl.TextSize            = 12
-    nameLbl.TextXAlignment      = Enum.TextXAlignment.Left
-    nameLbl.TextWrapped         = true
-
-    tab.MouseEnter:Connect(function()
-        if activeCat ~= cat.name then
-            TweenService:Create(tab, TweenInfo.new(0.1), {BackgroundTransparency = 0.7}):Play()
+        if activePage ~= name then
+            TweenService:Create(btn,TweenInfo.new(0.1),{BackgroundTransparency=1}):Play()
         end
     end)
-    tab.MouseLeave:Connect(function()
-        if activeCat ~= cat.name then
-            TweenService:Create(tab, TweenInfo.new(0.1), {BackgroundTransparency = 1}):Play()
-        end
-    end)
-    tab.MouseButton1Click:Connect(function() setCategory(cat.name) end)
-    tabBtns[cat.name] = tab
 
-    -- ── Content page ────────────────────────────────────
-    local page = Instance.new("ScrollingFrame", content)
-    page.Name               = cat.name
-    page.Size               = UDim2.new(1, 0, 1, 0)
-    page.BackgroundTransparency = 1
-    page.BorderSizePixel    = 0
-    page.ScrollBarThickness = 3
-    page.ScrollBarImageColor3 = C.border
-    page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    page.CanvasSize         = UDim2.new(0, 0, 0, 0)
-    page.Visible            = false
-
-    local pageList = Instance.new("UIListLayout", page)
-    pageList.SortOrder = Enum.SortOrder.LayoutOrder
-    pageList.Padding   = UDim.new(0, 8)
-    local pagePad = Instance.new("UIPadding", page)
-    pagePad.PaddingTop    = UDim.new(0, 14)
-    pagePad.PaddingLeft   = UDim.new(0, 12)
-    pagePad.PaddingRight  = UDim.new(0, 12)
-    pagePad.PaddingBottom = UDim.new(0, 14)
-
-    -- Section header
-    local header = Instance.new("TextLabel", page)
-    header.Size                = UDim2.new(1, 0, 0, 22)
-    header.BackgroundTransparency = 1
-    header.Text                = "Best " .. cat.name .. " Scripts"
-    header.TextColor3          = C.text
-    header.Font                = Enum.Font.GothamBlack
-    header.TextSize            = 15
-    header.TextXAlignment      = Enum.TextXAlignment.Left
-    header.LayoutOrder         = 0
-
-    -- Script cards
-    for si, scr in ipairs(cat.scripts) do
-        local card = Instance.new("TextButton", page)
-        card.Size                = UDim2.new(1, 0, 0, 72)
-        card.BackgroundColor3    = C.card
-        card.BorderSizePixel     = 0
-        card.Text                = ""
-        card.AutoButtonColor     = false
-        card.LayoutOrder         = si
-        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
-
-        -- Script name
-        local sName = Instance.new("TextLabel", card)
-        sName.Size               = UDim2.new(1, -56, 0, 22)
-        sName.Position           = UDim2.new(0, 14, 0, 12)
-        sName.BackgroundTransparency = 1
-        sName.Text               = scr.name .. "  (" .. scr.key .. ")"
-        sName.TextColor3         = C.text
-        sName.Font               = Enum.Font.GothamBlack
-        sName.TextSize           = 14
-        sName.TextXAlignment     = Enum.TextXAlignment.Left
-
-        -- Description
-        local sDesc = Instance.new("TextLabel", card)
-        sDesc.Size               = UDim2.new(1, -56, 0, 34)
-        sDesc.Position           = UDim2.new(0, 14, 0, 34)
-        sDesc.BackgroundTransparency = 1
-        sDesc.Text               = scr.desc
-        sDesc.TextColor3         = C.textDim
-        sDesc.Font               = Enum.Font.Gotham
-        sDesc.TextSize           = 12
-        sDesc.TextXAlignment     = Enum.TextXAlignment.Left
-        sDesc.TextWrapped        = true
-
-        -- Icon circle
-        local iconCircle = Instance.new("Frame", card)
-        iconCircle.Size             = UDim2.new(0, 36, 0, 36)
-        iconCircle.Position         = UDim2.new(1, -46, 0.5, -18)
-        iconCircle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        iconCircle.BorderSizePixel  = 0
-        Instance.new("UICorner", iconCircle).CornerRadius = UDim.new(1, 0)
-        local iconTxt = Instance.new("TextLabel", iconCircle)
-        iconTxt.Size                = UDim2.new(1, 0, 1, 0)
-        iconTxt.BackgroundTransparency = 1
-        iconTxt.Text                = scr.icon
-        iconTxt.TextSize            = 18
-        iconTxt.Font                = Enum.Font.GothamBold
-        iconTxt.TextColor3          = C.textDim
-
-        -- Status dot (shows loading state)
-        local statusDot = Instance.new("Frame", card)
-        statusDot.Size             = UDim2.new(0, 7, 0, 7)
-        statusDot.Position         = UDim2.new(0, 14, 0, 0)
-        statusDot.BackgroundColor3 = C.textDim
-        statusDot.BorderSizePixel  = 0
-        statusDot.Visible          = false
-        Instance.new("UICorner", statusDot).CornerRadius = UDim.new(1, 0)
-
-        -- Hover effects
-        card.MouseEnter:Connect(function()
-            TweenService:Create(card, TweenInfo.new(0.12), {BackgroundColor3 = C.cardHov}):Play()
-            TweenService:Create(iconCircle, TweenInfo.new(0.12), {BackgroundColor3 = cat.color}):Play()
-            TweenService:Create(iconTxt, TweenInfo.new(0.12), {TextColor3 = C.white}):Play()
-        end)
-        card.MouseLeave:Connect(function()
-            TweenService:Create(card, TweenInfo.new(0.12), {BackgroundColor3 = C.card}):Play()
-            TweenService:Create(iconCircle, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(50,50,50)}):Play()
-            TweenService:Create(iconTxt, TweenInfo.new(0.12), {TextColor3 = C.textDim}):Play()
-        end)
-
-        -- Click → execute script
-        local loaded = false
-        card.MouseButton1Click:Connect(function()
-            if loaded then
-                toast("Already loaded: " .. scr.name, C.yellow)
-                return
-            end
-            -- Visual feedback: turn icon orange while loading
-            TweenService:Create(iconCircle, TweenInfo.new(0.1), {BackgroundColor3 = C.accent}):Play()
-            iconTxt.Text = "⏳"
-            sName.TextColor3 = C.textDim
-            toast("Loading " .. scr.name .. "...", C.accent)
-
-            task.spawn(function()
-                local ok, err = pcall(function()
-                    loadstring(game:HttpGet(scr.url, true))()
-                end)
-                if ok then
-                    loaded = true
-                    -- Success state
-                    TweenService:Create(iconCircle, TweenInfo.new(0.2), {BackgroundColor3 = C.green}):Play()
-                    iconTxt.Text       = "✓"
-                    sName.TextColor3   = C.green
-                    toast("✓ " .. scr.name .. " loaded!", C.green)
-                else
-                    -- Error state
-                    TweenService:Create(iconCircle, TweenInfo.new(0.2), {BackgroundColor3 = C.red}):Play()
-                    iconTxt.Text       = "✕"
-                    sName.TextColor3   = C.red
-                    toast("✕ Failed: " .. tostring(err):sub(1, 40), C.red)
-                    task.delay(3, function()
-                        -- Reset so user can retry
-                        TweenService:Create(iconCircle, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50,50,50)}):Play()
-                        iconTxt.Text     = scr.icon
-                        sName.TextColor3 = C.text
-                    end)
-                end
-            end)
-        end)
-    end
-
-    pages[cat.name] = page
-end
-
--- ── Select first category ─────────────────────────────────
-setCategory(CATEGORIES[1].name)
-
--- ── Startup toast ─────────────────────────────────────────
-task.wait(0.3)
-toast("Eddie's Hub loaded", C.accent)
+    local 
