@@ -1,0 +1,594 @@
+-- ════════════════════════════════════════════════════════════════
+--  Exodus Hub V2  |  Universal Aimbot + Triggerbot + Misc
+--  Build  : 2026.04.16.4
+--  Notes  : aimbot, triggerbot, ESP, settings, misc (inf jump,
+--           noclip, fly, auto respawn, touch kill, anti-afk,
+--           fps boost). red/black Kunani-style UI. keyless.
+-- ════════════════════════════════════════════════════════════════
+
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService     = game:GetService("TweenService")
+local CoreGui          = game:GetService("CoreGui")
+local Teams            = game:GetService("Teams")
+local Lighting         = game:GetService("Lighting")
+local VirtualUser      = game:GetService("VirtualUser")
+local Camera           = workspace.CurrentCamera
+local LocalPlayer      = Players.LocalPlayer
+local Workspace        = workspace
+local mouse            = LocalPlayer:GetMouse()
+
+-- ════════════════════════════════════════════════════════════════
+--  STATE
+-- ════════════════════════════════════════════════════════════════
+local State = {
+    -- Aimbot
+    AimbotEnabled    = false,
+    AimbotKey        = nil,
+    AimbotSmooth     = 8,
+    AimbotFOV        = 90,
+    ShowFOV          = true,
+    AimbotTargetPart = "Head",
+    LockTeammates    = true,
+    WallCheck        = true,
+    -- Triggerbot
+    TriggerEnabled   = false,
+    TriggerKey       = nil,
+    TriggerAlwaysOn  = false,
+    TriggerDelay     = 0,
+    -- ESP
+    ESP = {
+        BoxESP       = false,
+        OutlineESP   = false,
+        NameESP      = false,
+        DistanceESP  = false,
+        ESPTeammates = false,
+    },
+    -- Settings
+    WalkSpeed        = 16,
+    JumpPower        = 50,
+    Fullbright       = false,
+    NoFog            = false,
+    UIKey            = Enum.KeyCode.Q,
+    -- Misc
+    InfJump          = false,
+    Noclip           = false,
+    Fly              = false,
+    FlySpeed         = 80,
+    AutoRespawn      = false,
+    TouchKill        = false,
+    AntiAFK          = false,
+    FPSBoost         = false,
+}
+
+local C = {
+    bg      = Color3.fromRGB(10, 8, 10),
+    panel   = Color3.fromRGB(18, 14, 16),
+    card    = Color3.fromRGB(28, 20, 24),
+    cardHov = Color3.fromRGB(38, 26, 30),
+    accent  = Color3.fromRGB(230, 30, 50),
+    accentB = Color3.fromRGB(140, 10, 25),
+    accentD = Color3.fromRGB(90, 5, 15),
+    border  = Color3.fromRGB(70, 22, 30),
+    text    = Color3.fromRGB(255, 230, 232),
+    dim     = Color3.fromRGB(170, 110, 120),
+    white   = Color3.fromRGB(255, 255, 255),
+    on      = Color3.fromRGB(220, 30, 50),
+    off     = Color3.fromRGB(32, 20, 24),
+    red     = Color3.fromRGB(255, 50, 60),
+    green   = Color3.fromRGB(80, 210, 130),
+    yellow  = Color3.fromRGB(255, 200, 60),
+}
+
+local BUILD_TAG = "v2.0.0"
+local OWNER_TAG = "exodus"
+
+-- ════════════════════════════════════════════════════════════════
+--  CLEANUP
+-- ════════════════════════════════════════════════════════════════
+pcall(function()
+    for _, g in ipairs(CoreGui:GetChildren()) do
+        if g.Name == "ExodusLoader" or g.Name == "ExodusHub_GUI"
+        or g.Name == "ExodusFloat" then
+            g:Destroy()
+        end
+    end
+end)
+
+-- ════════════════════════════════════════════════════════════════
+--  LOADING SCREEN
+-- ════════════════════════════════════════════════════════════════
+local loaderGui = Instance.new("ScreenGui")
+loaderGui.Name = "ExodusLoader"
+loaderGui.ResetOnSpawn = false
+loaderGui.DisplayOrder = 1000
+loaderGui.IgnoreGuiInset = true
+pcall(function() loaderGui.Parent = CoreGui end)
+if not loaderGui.Parent then loaderGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+
+local overlay = Instance.new("Frame", loaderGui)
+overlay.Size = UDim2.new(1,0,1,0)
+overlay.BackgroundColor3 = Color3.fromRGB(0,0,0)
+overlay.BackgroundTransparency = 1
+overlay.BorderSizePixel = 0
+TweenService:Create(overlay, TweenInfo.new(0.4), {BackgroundTransparency = 0.5}):Play()
+
+local card = Instance.new("Frame", loaderGui)
+card.AnchorPoint = Vector2.new(0.5, 0.5)
+card.Position = UDim2.new(0.5, 0, 0.65, 0)
+card.Size = UDim2.new(0, 540, 0, 230)
+card.BackgroundColor3 = C.bg
+card.BorderSizePixel = 0
+card.ClipsDescendants = true
+Instance.new("UICorner", card).CornerRadius = UDim.new(0, 16)
+local cardStroke = Instance.new("UIStroke", card)
+cardStroke.Color = C.border
+cardStroke.Thickness = 1.5
+
+local leftBar = Instance.new("Frame", card)
+leftBar.Size = UDim2.new(0, 4, 1, 0)
+leftBar.BackgroundColor3 = C.accent
+leftBar.BorderSizePixel = 0
+local lbg = Instance.new("UIGradient", leftBar)
+lbg.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, C.accentD),
+    ColorSequenceKeypoint.new(0.5, C.accent),
+    ColorSequenceKeypoint.new(1, C.accentD),
+})
+lbg.Rotation = 90
+
+local leftPanel = Instance.new("Frame", card)
+leftPanel.Size = UDim2.new(0, 190, 1, 0)
+leftPanel.Position = UDim2.new(0, 4, 0, 0)
+leftPanel.BackgroundColor3 = C.panel
+leftPanel.BorderSizePixel = 0
+
+local rightPanel = Instance.new("Frame", card)
+rightPanel.Size = UDim2.new(1, -194, 1, 0)
+rightPanel.Position = UDim2.new(0, 194, 0, 0)
+rightPanel.BackgroundTransparency = 1
+
+local mono = Instance.new("TextLabel", rightPanel)
+mono.Size = UDim2.new(0, 60, 0, 60)
+mono.Position = UDim2.new(0, 20, 0, 20)
+mono.BackgroundColor3 = C.accentB
+mono.BorderSizePixel = 0
+mono.Text = "E"
+mono.TextColor3 = C.white
+mono.Font = Enum.Font.GothamBlack
+mono.TextSize = 34
+Instance.new("UICorner", mono).CornerRadius = UDim.new(0, 12)
+local monoG = Instance.new("UIGradient", mono)
+monoG.Color = ColorSequence.new(C.accent, C.accentB)
+monoG.Rotation = 45
+
+local rTitle = Instance.new("TextLabel", rightPanel)
+rTitle.Size = UDim2.new(1, -100, 0, 26)
+rTitle.Position = UDim2.new(0, 92, 0, 24)
+rTitle.BackgroundTransparency = 1
+rTitle.Text = "Exodus Hub"
+rTitle.TextColor3 = C.text
+rTitle.Font = Enum.Font.GothamBlack
+rTitle.TextSize = 20
+rTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local rTag = Instance.new("TextLabel", rightPanel)
+rTag.Size = UDim2.new(1, -100, 0, 16)
+rTag.Position = UDim2.new(0, 92, 0, 52)
+rTag.BackgroundTransparency = 1
+rTag.Text = "V2  ·  Keyless  ·  Universal"
+rTag.TextColor3 = C.accent
+rTag.Font = Enum.Font.GothamBold
+rTag.TextSize = 11
+rTag.TextXAlignment = Enum.TextXAlignment.Left
+
+local rBy = Instance.new("TextLabel", rightPanel)
+rBy.Size = UDim2.new(1, -100, 0, 14)
+rBy.Position = UDim2.new(0, 92, 0, 70)
+rBy.BackgroundTransparency = 1
+rBy.Text = "by " .. OWNER_TAG
+rBy.TextColor3 = C.dim
+rBy.Font = Enum.Font.Gotham
+rBy.TextSize = 10
+rBy.TextXAlignment = Enum.TextXAlignment.Left
+
+local rDiv = Instance.new("Frame", rightPanel)
+rDiv.Size = UDim2.new(1, -40, 0, 1)
+rDiv.Position = UDim2.new(0, 20, 0, 100)
+rDiv.BackgroundColor3 = C.border
+rDiv.BorderSizePixel = 0
+
+local rStatus = Instance.new("TextLabel", rightPanel)
+rStatus.Size = UDim2.new(1, -40, 0, 16)
+rStatus.Position = UDim2.new(0, 20, 0, 112)
+rStatus.BackgroundTransparency = 1
+rStatus.Text = "Initialising..."
+rStatus.TextColor3 = C.dim
+rStatus.Font = Enum.Font.Gotham
+rStatus.TextSize = 11
+rStatus.TextXAlignment = Enum.TextXAlignment.Left
+
+local rTrack = Instance.new("Frame", rightPanel)
+rTrack.Size = UDim2.new(1, -40, 0, 5)
+rTrack.Position = UDim2.new(0, 20, 0, 140)
+rTrack.BackgroundColor3 = C.card
+rTrack.BorderSizePixel = 0
+Instance.new("UICorner", rTrack).CornerRadius = UDim.new(1, 0)
+
+local rFill = Instance.new("Frame", rTrack)
+rFill.Size = UDim2.new(0, 0, 1, 0)
+rFill.BackgroundColor3 = C.accent
+rFill.BorderSizePixel = 0
+Instance.new("UICorner", rFill).CornerRadius = UDim.new(1, 0)
+local rfg = Instance.new("UIGradient", rFill)
+rfg.Color = ColorSequence.new(C.accentB, C.accent)
+
+local rPct = Instance.new("TextLabel", rightPanel)
+rPct.Size = UDim2.new(1, -40, 0, 16)
+rPct.Position = UDim2.new(0, 20, 0, 154)
+rPct.BackgroundTransparency = 1
+rPct.Text = "0%"
+rPct.TextColor3 = C.accent
+rPct.Font = Enum.Font.GothamBold
+rPct.TextSize = 10
+rPct.TextXAlignment = Enum.TextXAlignment.Right
+
+local rVer = Instance.new("TextLabel", rightPanel)
+rVer.Size = UDim2.new(1, -40, 0, 16)
+rVer.Position = UDim2.new(0, 20, 1, -26)
+rVer.BackgroundTransparency = 1
+rVer.Text = BUILD_TAG .. "  ·  " .. OWNER_TAG
+rVer.TextColor3 = C.border
+rVer.Font = Enum.Font.Gotham
+rVer.TextSize = 9
+rVer.TextXAlignment = Enum.TextXAlignment.Right
+
+local STEPS = {
+    {label="Services",  sub="Loading core modules"},
+    {label="Interface", sub="Building UI"},
+    {label="Aimbot",    sub="Configuring aim"},
+    {label="Trigger",   sub="Wiring trigger"},
+    {label="ESP",       sub="Setting visuals"},
+    {label="Misc",      sub="Loading misc"},
+    {label="Ready",     sub="Finishing up"},
+}
+
+local stepDots, stepLabels = {}, {}
+for i, step in ipairs(STEPS) do
+    local y = 14 + (i-1) * 30
+    if i < #STEPS then
+        local line = Instance.new("Frame", leftPanel)
+        line.Size = UDim2.new(0, 2, 0, 18)
+        line.Position = UDim2.new(0, 21, 0, y+14)
+        line.BackgroundColor3 = C.border
+        line.BorderSizePixel = 0
+    end
+    local dot = Instance.new("Frame", leftPanel)
+    dot.Size = UDim2.new(0, 12, 0, 12)
+    dot.Position = UDim2.new(0, 16, 0, y+1)
+    dot.BackgroundColor3 = C.border
+    dot.BorderSizePixel = 0
+    Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+    stepDots[i] = dot
+
+    local lbl = Instance.new("TextLabel", leftPanel)
+    lbl.Size = UDim2.new(1, -40, 0, 14)
+    lbl.Position = UDim2.new(0, 36, 0, y)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = step.label
+    lbl.TextColor3 = C.dim
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 11
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    stepLabels[i] = lbl
+
+    local sub = Instance.new("TextLabel", leftPanel)
+    sub.Size = UDim2.new(1, -40, 0, 10)
+    sub.Position = UDim2.new(0, 36, 0, y+14)
+    sub.BackgroundTransparency = 1
+    sub.Text = step.sub
+    sub.TextColor3 = C.border
+    sub.Font = Enum.Font.Gotham
+    sub.TextSize = 9
+    sub.TextXAlignment = Enum.TextXAlignment.Left
+end
+
+TweenService:Create(card, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+    Position = UDim2.new(0.5, 0, 0.5, 0)
+}):Play()
+task.wait(0.55)
+
+for i = 1, #STEPS do
+    stepDots[i].BackgroundColor3 = C.accent
+    stepLabels[i].TextColor3 = C.text
+    local pct = i / #STEPS
+    TweenService:Create(rFill, TweenInfo.new(0.28, Enum.EasingStyle.Quad), {
+        Size = UDim2.new(pct, 0, 1, 0)
+    }):Play()
+    rPct.Text = math.floor(pct * 100) .. "%"
+    rStatus.Text = STEPS[i].sub .. "..."
+    task.wait(0.28)
+    stepDots[i].BackgroundColor3 = C.green
+    local chk = Instance.new("TextLabel", stepDots[i])
+    chk.Size = UDim2.new(1,0,1,0)
+    chk.BackgroundTransparency = 1
+    chk.Text = "✓"
+    chk.TextColor3 = C.white
+    chk.Font = Enum.Font.GothamBlack
+    chk.TextSize = 8
+end
+
+rFill.Size = UDim2.new(1,0,1,0)
+rPct.Text = "100%"
+rStatus.Text = "Ready!"
+rStatus.TextColor3 = C.green
+task.wait(0.35)
+
+TweenService:Create(card, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
+    Position = UDim2.new(0.5, 0, -0.3, 0)
+}):Play()
+TweenService:Create(overlay, TweenInfo.new(0.4), {BackgroundTransparency = 1}):Play()
+task.wait(0.42)
+loaderGui:Destroy()
+
+-- ════════════════════════════════════════════════════════════════
+--  FOV CIRCLE
+-- ════════════════════════════════════════════════════════════════
+local FOVCircle
+pcall(function()
+    FOVCircle = Drawing.new("Circle")
+    FOVCircle.Color = C.accent
+    FOVCircle.Thickness = 1.5
+    FOVCircle.NumSides = 64
+    FOVCircle.Filled = false
+    FOVCircle.Visible = true
+end)
+
+local function isTeammate(p)
+    return LocalPlayer.Team and p.Team == LocalPlayer.Team
+end
+local function getESPColor(p)
+    if #Teams:GetChildren() > 0 and p.TeamColor then return p.TeamColor.Color end
+    return C.accent
+end
+
+-- ════════════════════════════════════════════════════════════════
+--  MAIN GUI
+-- ════════════════════════════════════════════════════════════════
+local Gui = Instance.new("ScreenGui")
+pcall(function() Gui.Parent = CoreGui end)
+if not Gui.Parent then Gui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+Gui.Name = "ExodusHub_GUI"
+Gui.ResetOnSpawn = false
+Gui.DisplayOrder = 999
+Gui.IgnoreGuiInset = true
+
+local Win = Instance.new("Frame", Gui)
+Win.Size = UDim2.new(0, 460, 0, 360)
+Win.Position = UDim2.new(0.5, -230, 0.5, -180)
+Win.BackgroundColor3 = C.bg
+Win.BorderSizePixel = 0
+Win.ClipsDescendants = true
+Instance.new("UICorner", Win).CornerRadius = UDim.new(0, 14)
+local winStroke = Instance.new("UIStroke", Win)
+winStroke.Color = C.border
+winStroke.Thickness = 1.2
+
+local TBar = Instance.new("Frame", Win)
+TBar.Size = UDim2.new(1,0,0,36)
+TBar.BackgroundColor3 = C.panel
+TBar.BorderSizePixel = 0
+
+local TBarDiv = Instance.new("Frame", TBar)
+TBarDiv.Size = UDim2.new(1,0,0,1)
+TBarDiv.Position = UDim2.new(0,0,1,-1)
+TBarDiv.BackgroundColor3 = C.border
+TBarDiv.BorderSizePixel = 0
+
+local accentTag = Instance.new("Frame", TBar)
+accentTag.Size = UDim2.new(0,3,0,20)
+accentTag.Position = UDim2.new(0,12,0.5,-10)
+accentTag.BackgroundColor3 = C.accent
+accentTag.BorderSizePixel = 0
+Instance.new("UICorner", accentTag).CornerRadius = UDim.new(1,0)
+
+local mark2 = Instance.new("Frame", TBar)
+mark2.Size = UDim2.new(0, 20, 0, 20)
+mark2.Position = UDim2.new(0, 20, 0.5, -10)
+mark2.BackgroundColor3 = C.accentB
+mark2.BorderSizePixel = 0
+Instance.new("UICorner", mark2).CornerRadius = UDim.new(0, 5)
+local mark2Txt = Instance.new("TextLabel", mark2)
+mark2Txt.Size = UDim2.new(1,0,1,0)
+mark2Txt.BackgroundTransparency = 1
+mark2Txt.Text = "E"
+mark2Txt.TextColor3 = C.white
+mark2Txt.Font = Enum.Font.GothamBlack
+mark2Txt.TextSize = 12
+
+local TTitle = Instance.new("TextLabel", TBar)
+TTitle.Size = UDim2.new(1,-150,1,0)
+TTitle.Position = UDim2.new(0,46,0,0)
+TTitle.BackgroundTransparency = 1
+TTitle.Text = "Exodus Hub V2  |  Keyless"
+TTitle.TextColor3 = C.text
+TTitle.Font = Enum.Font.GothamBlack
+TTitle.TextSize = 13
+TTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local TVer = Instance.new("TextLabel", TBar)
+TVer.Size = UDim2.new(0,70,1,0)
+TVer.Position = UDim2.new(1,-94,0,0)
+TVer.BackgroundTransparency = 1
+TVer.Text = "by " .. OWNER_TAG
+TVer.TextColor3 = C.dim
+TVer.Font = Enum.Font.Gotham
+TVer.TextSize = 10
+TVer.TextXAlignment = Enum.TextXAlignment.Right
+
+local function headerBtn(xOff, lbl, col)
+    local b = Instance.new("TextButton", TBar)
+    b.Size = UDim2.new(0,22,0,22)
+    b.Position = UDim2.new(1,xOff,0.5,-11)
+    b.BackgroundColor3 = col
+    b.BorderSizePixel = 0
+    b.Text = lbl
+    b.TextColor3 = C.white
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 11
+    b.AutoButtonColor = false
+    Instance.new("UICorner", b).CornerRadius = UDim.new(1,0)
+    b.MouseEnter:Connect(function()
+        TweenService:Create(b,TweenInfo.new(0.1),{BackgroundColor3=col:Lerp(C.white,0.3)}):Play()
+    end)
+    b.MouseLeave:Connect(function()
+        TweenService:Create(b,TweenInfo.new(0.1),{BackgroundColor3=col}):Play()
+    end)
+    return b
+end
+
+local HideBtn  = headerBtn(-28, "−", Color3.fromRGB(70,30,36))
+local CloseBtn = headerBtn(-54, "×", Color3.fromRGB(200,40,50))
+
+local Sidebar = Instance.new("Frame", Win)
+Sidebar.Size = UDim2.new(0,100,1,-36)
+Sidebar.Position = UDim2.new(0,0,0,36)
+Sidebar.BackgroundColor3 = C.panel
+Sidebar.BorderSizePixel = 0
+
+local SideDiv = Instance.new("Frame", Win)
+SideDiv.Size = UDim2.new(0,1,1,-36)
+SideDiv.Position = UDim2.new(0,100,0,36)
+SideDiv.BackgroundColor3 = C.border
+SideDiv.BorderSizePixel = 0
+
+local ContentArea = Instance.new("Frame", Win)
+ContentArea.Size = UDim2.new(1,-101,1,-36)
+ContentArea.Position = UDim2.new(0,101,0,36)
+ContentArea.BackgroundTransparency = 1
+ContentArea.ClipsDescendants = true
+
+local FloatGui = Instance.new("ScreenGui")
+pcall(function() FloatGui.Parent = CoreGui end)
+if not FloatGui.Parent then FloatGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+FloatGui.Name = "ExodusFloat"
+FloatGui.ResetOnSpawn = false
+FloatGui.Enabled = false
+
+local FloatBtn = Instance.new("TextButton", FloatGui)
+FloatBtn.Size = UDim2.new(0,130,0,30)
+FloatBtn.Position = UDim2.new(1,-140,0,10)
+FloatBtn.BackgroundColor3 = C.accentB
+FloatBtn.BorderSizePixel = 0
+FloatBtn.Text = "Exodus Hub V2"
+FloatBtn.TextColor3 = C.white
+FloatBtn.Font = Enum.Font.GothamBold
+FloatBtn.TextSize = 12
+FloatBtn.AutoButtonColor = false
+Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(0,8)
+Instance.new("UIStroke", FloatBtn).Color = C.accent
+
+HideBtn.MouseButton1Click:Connect(function() Gui.Enabled = false; FloatGui.Enabled = true end)
+CloseBtn.MouseButton1Click:Connect(function()
+    Gui:Destroy()
+    FloatGui:Destroy()
+    if FOVCircle then FOVCircle.Visible = false end
+end)
+FloatBtn.MouseButton1Click:Connect(function() Gui.Enabled = true; FloatGui.Enabled = false end)
+
+local dragOn, dragStart, winStart = false, nil, nil
+TBar.InputBegan:Connect(function(inp)
+    if inp.UserInputType == Enum.UserInputType.MouseButton1
+    or inp.UserInputType == Enum.UserInputType.Touch then
+        dragOn = true
+        dragStart = inp.Position
+        winStart = Win.Position
+    end
+end)
+TBar.InputEnded:Connect(function(inp)
+    if inp.UserInputType == Enum.UserInputType.MouseButton1
+    or inp.UserInputType == Enum.UserInputType.Touch then
+        dragOn = false
+    end
+end)
+UserInputService.InputChanged:Connect(function(inp)
+    if not dragOn then return end
+    if inp.UserInputType == Enum.UserInputType.MouseMovement
+    or inp.UserInputType == Enum.UserInputType.Touch then
+        Win.Position = UDim2.new(
+            winStart.X.Scale, winStart.X.Offset + (inp.Position.X - dragStart.X),
+            winStart.Y.Scale, winStart.Y.Offset + (inp.Position.Y - dragStart.Y)
+        )
+    end
+end)
+
+-- ── tab system ──────────────────────────────────────────────────
+local tabs, tabBtns = {}, {}
+local activePage = nil
+
+local sidePad = Instance.new("UIPadding", Sidebar)
+sidePad.PaddingTop = UDim.new(0,6)
+sidePad.PaddingLeft = UDim.new(0,6)
+sidePad.PaddingRight = UDim.new(0,6)
+local sideList = Instance.new("UIListLayout", Sidebar)
+sideList.SortOrder = Enum.SortOrder.LayoutOrder
+sideList.Padding = UDim.new(0,3)
+
+local function setPage(name)
+    if activePage == name then return end
+    activePage = name
+    for n, pg in pairs(tabs) do pg.Visible = (n == name) end
+    for n, btn in pairs(tabBtns) do
+        local on = (n == name)
+        TweenService:Create(btn, TweenInfo.new(0.15), {
+            BackgroundColor3 = on and C.card or Color3.fromRGB(0,0,0),
+            BackgroundTransparency = on and 0 or 1,
+        }):Play()
+        local lb = btn:FindFirstChildOfClass("TextLabel")
+        if lb then lb.TextColor3 = on and C.text or C.dim end
+    end
+end
+
+local function addTab(name, icon, order)
+    local btn = Instance.new("TextButton", Sidebar)
+    btn.Size = UDim2.new(1,0,0,48)
+    btn.BackgroundColor3 = Color3.fromRGB(0,0,0)
+    btn.BackgroundTransparency = 1
+    btn.BorderSizePixel = 0
+    btn.Text = ""
+    btn.AutoButtonColor = false
+    btn.LayoutOrder = order
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
+
+    local ico = Instance.new("TextLabel", btn)
+    ico.Size = UDim2.new(1,0,0,20)
+    ico.Position = UDim2.new(0,0,0,6)
+    ico.BackgroundTransparency = 1
+    ico.Text = icon
+    ico.TextSize = 16
+    ico.Font = Enum.Font.GothamBold
+    ico.TextColor3 = C.dim
+
+    local lb = Instance.new("TextLabel", btn)
+    lb.Size = UDim2.new(1,0,0,14)
+    lb.Position = UDim2.new(0,0,0,28)
+    lb.BackgroundTransparency = 1
+    lb.Text = name
+    lb.TextSize = 10
+    lb.Font = Enum.Font.GothamBold
+    lb.TextColor3 = C.dim
+
+    btn.MouseButton1Click:Connect(function() setPage(name) end)
+    btn.MouseEnter:Connect(function()
+        if activePage ~= name then
+            TweenService:Create(btn,TweenInfo.new(0.1),{BackgroundTransparency=0.7}):Play()
+        end
+    end)
+    btn.MouseLeave:Connect(function()
+        if activePage ~= name then
+            TweenService:Create(btn,TweenInfo.new(0.1),{BackgroundTransparency=1}):Play()
+        end
+    end)
+
+    local 
